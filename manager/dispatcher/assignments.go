@@ -35,7 +35,9 @@ func newAssignmentSet(log *logrus.Entry, dp *drivers.DriverProvider) *assignment
 }
 
 func assignSecret(a *assignmentSet, readTx store.ReadTx, mapKey typeAndID, t *api.Task) {
-	a.tasksUsingDependency[mapKey] = make(map[string]struct{})
+	if _, exists := a.tasksUsingDependency[mapKey]; !exists {
+		a.tasksUsingDependency[mapKey] = make(map[string]struct{})
+	}
 	secret, err := a.secret(readTx, t, mapKey.id)
 	if err != nil {
 		a.log.WithFields(logrus.Fields{
@@ -104,7 +106,7 @@ func (a *assignmentSet) addTaskDependencies(readTx store.ReadTx, t *api.Task) {
 		secretID := secretRef.SecretID
 		mapKey := typeAndID{objType: api.ResourceType_SECRET, id: secretID}
 
-		if len(a.tasksUsingDependency[mapKey]) == 0 {
+		if _, exists := a.tasksUsingDependency[mapKey]; !exists {
 			assignSecret(a, readTx, mapKey, t)
 		}
 		a.tasksUsingDependency[mapKey][t.ID] = struct{}{}
