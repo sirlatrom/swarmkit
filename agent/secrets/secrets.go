@@ -60,13 +60,18 @@ func (s *secrets) Reset() {
 
 // taskRestrictedSecretsProvider restricts the ids to the task.
 type taskRestrictedSecretsProvider struct {
-	secrets   exec.SecretGetter
-	secretIDs map[string]struct{} // allow list of secret ids
+	secrets        exec.SecretGetter
+	secretIDs      map[string]struct{} // allow list of secret ids
+	secretMappings map[string]string   // for mapping referenced secret id to an internal secret
 }
 
 func (sp *taskRestrictedSecretsProvider) Get(secretID string) (*api.Secret, error) {
 	if _, ok := sp.secretIDs[secretID]; !ok {
 		return nil, fmt.Errorf("task not authorized to access secret %s", secretID)
+	}
+
+	if replacement, ok := sp.secretMappings[secretID]; ok {
+		secretID = replacement
 	}
 
 	return sp.secrets.Get(secretID)
@@ -84,5 +89,5 @@ func Restrict(secrets exec.SecretGetter, t *api.Task) exec.SecretGetter {
 		}
 	}
 
-	return &taskRestrictedSecretsProvider{secrets: secrets, secretIDs: sids}
+	return &taskRestrictedSecretsProvider{secrets: secrets, secretIDs: sids, secretMappings: t.SecretMappings}
 }

@@ -143,8 +143,9 @@ func validateContainerSpec(taskSpec api.TaskSpec) error {
 		ServiceAnnotations: api.Annotations{
 			Name: "servicename",
 		},
-		Endpoint:  &api.Endpoint{},
-		LogDriver: taskSpec.LogDriver,
+		Endpoint:       &api.Endpoint{},
+		LogDriver:      taskSpec.LogDriver,
+		SecretMappings: map[string]string{},
 	})
 	if err != nil {
 		return status.Errorf(codes.InvalidArgument, err.Error())

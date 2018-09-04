@@ -39,8 +39,9 @@ func NewTask(cluster *api.Cluster, service *api.Service, slot uint64, nodeID str
 		Endpoint: &api.Endpoint{
 			Spec: service.Spec.Endpoint.Copy(),
 		},
-		DesiredState: api.TaskStateRunning,
-		LogDriver:    logDriver,
+		DesiredState:   api.TaskStateRunning,
+		LogDriver:      logDriver,
+		SecretMappings: map[string]string{},
 	}
 
 	// In global mode we also set the NodeID

@@ -247,6 +247,11 @@ message Task {
 	Driver log_driver = 13;
 
 	repeated GenericResource assigned_generic_resources = 15;
+
+	// SecretMappings specifies a mapping from secret IDs present in the TaskSpec,
+	// which are to be replaced by internal secrets in order to support assigning
+	// different secret values to different tasks of the same service.
+	map<string,string> secret_mappings = 16;
 }
 
 // NetworkAttachment specifies the network parameters of attachment to

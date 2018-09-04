@@ -6,6 +6,7 @@ import (
 	"github.com/docker/swarmkit/api"
 	"github.com/docker/swarmkit/api/equality"
 	"github.com/docker/swarmkit/api/validation"
+	"github.com/docker/swarmkit/identity"
 	"github.com/docker/swarmkit/manager/drivers"
 	"github.com/docker/swarmkit/manager/state/store"
 	"github.com/sirupsen/logrus"
@@ -35,7 +36,9 @@ func newAssignmentSet(log *logrus.Entry, dp *drivers.DriverProvider) *assignment
 }
 
 func assignSecret(a *assignmentSet, readTx store.ReadTx, mapKey typeAndID, t *api.Task) {
-	a.tasksUsingDependency[mapKey] = make(map[string]struct{})
+	if _, exists := a.tasksUsingDependency[mapKey]; !exists {
+		a.tasksUsingDependency[mapKey] = make(map[string]struct{})
+	}
 	secret, err := a.secret(readTx, t, mapKey.id)
 	if err != nil {
 		a.log.WithFields(logrus.Fields{
@@ -44,6 +47,22 @@ func assignSecret(a *assignmentSet, readTx store.ReadTx, mapKey typeAndID, t *ap
 			"error":         err,
 		}).Debug("failed to fetch secret")
 		return
+	}
+	// If a driver is used, give a unique ID per task to allow different values for different tasks
+	if secret.Spec.Driver != nil {
+		// Give the secret a new ID and mark it as internal
+		originalSecretID := secret.ID
+		secret.ID = identity.NewID()
+		secret.Internal = true
+		// Create a new mapKey with the new ID and insert it into the dependencies map for the task.
+		// This will make the changes map contain an entry with the new ID rather than the original one.
+		mapKey = typeAndID{objType: mapKey.objType, id: secret.ID}
+		a.tasksUsingDependency[mapKey] = make(map[string]struct{})
+		a.tasksUsingDependency[mapKey][t.ID] = struct{}{}
+		if t.SecretMappings == nil {
+			t.SecretMappings = map[string]string{}
+		}
+		t.SecretMappings[originalSecretID] = secret.ID
 	}
 	a.changes[mapKey] = &api.AssignmentChange{
 		Assignment: &api.Assignment{
@@ -104,7 +123,7 @@ func (a *assignmentSet) addTaskDependencies(readTx store.ReadTx, t *api.Task) {
 		secretID := secretRef.SecretID
 		mapKey := typeAndID{objType: api.ResourceType_SECRET, id: secretID}
 
-		if len(a.tasksUsingDependency[mapKey]) == 0 {
+		if _, exists := a.tasksUsingDependency[mapKey][t.ID]; !exists {
 			assignSecret(a, readTx, mapKey, t)
 		}
 		a.tasksUsingDependency[mapKey][t.ID] = struct{}{}
